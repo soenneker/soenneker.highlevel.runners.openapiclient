@@ -51,12 +51,14 @@ public sealed class FileOperationsUtil : IFileOperationsUtil
     {
         string gitDirectory = await _gitUtil.CloneToTempDirectory($"https://github.com/soenneker/{Constants.Library.ToLowerInvariantFast()}", cancellationToken: cancellationToken);
 
+        string appsDirectory = Path.Combine(gitDirectory, "apps");
+
         _directoryUtil.CreateIfDoesNotExist(Path.Combine(gitDirectory, "common"));
-        _directoryUtil.CreateIfDoesNotExist(Path.Combine(gitDirectory, "apps"));
+        _directoryUtil.CreateIfDoesNotExist(appsDirectory);
 
         string commonFilePath = Path.Combine(gitDirectory, "common", "common-schemas.json");
-        string targetFilePath = Path.Combine(gitDirectory, "apps", "openapi.json");
-        string fixedFilePath = Path.Combine(gitDirectory, "apps", "fixed.json");
+        string targetFilePath = Path.Combine(appsDirectory, "openapi.json");
+        string fixedFilePath = Path.Combine(appsDirectory, "fixed.json");
 
         await _fileUtil.DeleteIfExists(commonFilePath, cancellationToken: cancellationToken);
         await _fileUtil.DeleteIfExists(targetFilePath, cancellationToken: cancellationToken);
@@ -91,7 +93,7 @@ public sealed class FileOperationsUtil : IFileOperationsUtil
 
         DeleteAllExceptCsproj(srcDirectory);
 
-        await _processUtil.Start("kiota", gitDirectory, $"kiota generate -l CSharp -d \"{fixedFilePath}\" -o src -c HighLevelOpenApiClient -n {Constants.Library}",
+        await _processUtil.Start("kiota", appsDirectory, $"kiota generate -l CSharp -d \"fixed.json\" -o src -c HighLevelOpenApiClient -n {Constants.Library}",
             waitForExit: true, cancellationToken: cancellationToken).NoSync();
 
         await BuildAndPush(gitDirectory, cancellationToken).NoSync();
