@@ -93,7 +93,7 @@ public sealed class FileOperationsUtil : IFileOperationsUtil
 
         DeleteAllExceptCsproj(srcDirectory);
 
-        await _processUtil.Start("kiota", appsDirectory, $"kiota generate -l CSharp -d \"fixed.json\" -o src -c HighLevelOpenApiClient -n {Constants.Library}",
+        await _processUtil.Start("kiota", appsDirectory, $"generate -l CSharp -d \"fixed.json\" -o \"{srcDirectory}\" -c HighLevelOpenApiClient -n {Constants.Library}",
             waitForExit: true, cancellationToken: cancellationToken).NoSync();
 
         await BuildAndPush(gitDirectory, cancellationToken).NoSync();
