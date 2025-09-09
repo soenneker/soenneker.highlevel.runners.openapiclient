@@ -7,7 +7,6 @@ using Soenneker.Extensions.Task;
 using Soenneker.Extensions.ValueTask;
 using Soenneker.Git.Util.Abstract;
 using Soenneker.HighLevel.Runners.OpenApiClient.Utils.Abstract;
-using Soenneker.OpenApi.Fixer;
 using Soenneker.OpenApi.Fixer.Abstract;
 using Soenneker.Utils.Directory.Abstract;
 using Soenneker.Utils.Dotnet.Abstract;
@@ -67,9 +66,17 @@ public sealed class FileOperationsUtil : IFileOperationsUtil
 
         string appsDir = Path.Combine(openapiDocsDirectory, "apps");
 
+        string commonDir = Path.Combine(openapiDocsDirectory, "common");
+
         List<string> files = Directory.EnumerateFiles(appsDir, "*.*", SearchOption.TopDirectoryOnly).Where(f =>
             f.EndsWith(".yaml", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".yml", StringComparison.OrdinalIgnoreCase) ||
             f.EndsWith(".json", StringComparison.OrdinalIgnoreCase)).ToList();
+
+        List<string> commonFiles = Directory.EnumerateFiles(commonDir, "*.*", SearchOption.TopDirectoryOnly).Where(f =>
+            f.EndsWith(".yaml", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".yml", StringComparison.OrdinalIgnoreCase) ||
+            f.EndsWith(".json", StringComparison.OrdinalIgnoreCase)).ToList();
+
+        files.AddRange(commonFiles);
 
         (string prefix, string f)[] inputs = files.Select(f =>
         {
@@ -85,7 +92,7 @@ public sealed class FileOperationsUtil : IFileOperationsUtil
 
         await _openApiFixer.Fix(targetFilePath, fixedFilePath, cancellationToken);
 
-        await _fileUtil.Copy(Path.Combine(openapiDocsDirectory, "common", "common-schemas.json"), commonFilePath, true, cancellationToken);
+        await RefReplacer.ReplaceRefs(fixedFilePath, fixedFilePath, cancellationToken);
 
         await _processUtil.Start("dotnet", null, "tool update --global Microsoft.OpenApi.Kiota", waitForExit: true, cancellationToken: cancellationToken);
 
