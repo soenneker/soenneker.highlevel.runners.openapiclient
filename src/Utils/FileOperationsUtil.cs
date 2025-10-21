@@ -144,7 +144,19 @@ public sealed class FileOperationsUtil : IFileOperationsUtil
             // 1) merge paths with a prefix (e.g., "/contacts")
             foreach (KeyValuePair<string, IOpenApiPathItem> kvp in document.Paths)
             {
-                string newKey = "/" + prefix.Trim('/') + (kvp.Key.StartsWith("/") ? "" : "/") + kvp.Key;
+                string trimmedPrefix = prefix.Trim('/');
+                string newKey;
+                
+                // Check if the path already starts with the prefix to avoid duplication
+                if (kvp.Key.StartsWith("/" + trimmedPrefix + "/") || kvp.Key == "/" + trimmedPrefix)
+                {
+                    newKey = kvp.Key; // Use the original path if it already has the prefix
+                }
+                else
+                {
+                    newKey = "/" + trimmedPrefix + (kvp.Key.StartsWith("/") ? "" : "/") + kvp.Key;
+                }
+                
                 merged.Paths[newKey] = kvp.Value;
             }
 
