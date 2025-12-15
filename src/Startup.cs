@@ -20,8 +20,11 @@ public static class Startup
 
     public static IServiceCollection SetupIoC(this IServiceCollection services)
     {
-        services.AddHostedService<ConsoleHostedService>().AddScoped<IFileOperationsUtil, FileOperationsUtil>().AddRunnersManagerAsScoped().AddFileDownloadUtilAsScoped()
-            .AddOpenApiFixerAsScoped();
+        services.AddHostedService<ConsoleHostedService>()
+                .AddScoped<IFileOperationsUtil, FileOperationsUtil>()
+                .AddRunnersManagerAsScoped()
+                .AddFileDownloadUtilAsScoped()
+                .AddOpenApiFixerAsScoped();
 
         return services;
     }
