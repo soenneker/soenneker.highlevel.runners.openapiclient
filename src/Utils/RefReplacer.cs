@@ -1,7 +1,6 @@
-﻿using System.IO;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Soenneker.Utils.File.Abstract;
 
 namespace Soenneker.HighLevel.Runners.OpenApiClient.Utils;
 
@@ -19,13 +18,13 @@ public static class RefReplacer
             "\"$ref\": \"#/components/schemas/UnprocessableDTO\"")
     ];
 
-    public static async Task ReplaceRefs(string inputPath, string outputPath, CancellationToken cancellationToken = default)
+    public static async Task ReplaceRefs(IFileUtil fileUtil, string inputPath, string outputPath, CancellationToken cancellationToken = default)
     {
-        string text = await File.ReadAllTextAsync(inputPath, Encoding.UTF8, cancellationToken);
+        string text = await fileUtil.Read(inputPath, cancellationToken: cancellationToken);
 
         foreach (var (oldRef, newRef) in _replacements)
             text = text.Replace(oldRef, newRef);
 
-        await File.WriteAllTextAsync(outputPath, text, Encoding.UTF8, cancellationToken);
+        await fileUtil.Write(outputPath, text, cancellationToken: cancellationToken);
     }
 }

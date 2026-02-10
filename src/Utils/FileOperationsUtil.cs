@@ -92,7 +92,7 @@ public sealed class FileOperationsUtil : IFileOperationsUtil
 
         await _openApiFixer.Fix(targetFilePath, fixedFilePath, cancellationToken);
 
-        await RefReplacer.ReplaceRefs(fixedFilePath, fixedFilePath, cancellationToken);
+        await RefReplacer.ReplaceRefs(_fileUtil, fixedFilePath, fixedFilePath, cancellationToken);
 
         await _processUtil.Start("dotnet", null, "tool update --global Microsoft.OpenApi.Kiota", waitForExit: true, cancellationToken: cancellationToken);
 
@@ -117,9 +117,7 @@ public sealed class FileOperationsUtil : IFileOperationsUtil
 
         foreach ((string prefix, string file) in inputs)
         {
-            await using FileStream fs = File.OpenRead(file);
-            var memoryStream = new MemoryStream();
-            await fs.CopyToAsync(memoryStream).NoSync();
+            await using var memoryStream = await _fileUtil.ReadToMemoryStream(file, cancellationToken: CancellationToken.None);
             memoryStream.ToStart();
 
             var uri = new Uri($"file://{file}");
