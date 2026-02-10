@@ -68,11 +68,13 @@ public sealed class FileOperationsUtil : IFileOperationsUtil
 
         string commonDir = Path.Combine(openapiDocsDirectory, "common");
 
-        List<string> files = Directory.EnumerateFiles(appsDir, "*.*", SearchOption.TopDirectoryOnly).Where(f =>
+        List<string> appsFiles = await _directoryUtil.GetFilesByExtension(appsDir, "", false, cancellationToken);
+        List<string> files = appsFiles.Where(f =>
             f.EndsWith(".yaml", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".yml", StringComparison.OrdinalIgnoreCase) ||
             f.EndsWith(".json", StringComparison.OrdinalIgnoreCase)).ToList();
 
-        List<string> commonFiles = Directory.EnumerateFiles(commonDir, "*.*", SearchOption.TopDirectoryOnly).Where(f =>
+        List<string> commonFilesRaw = await _directoryUtil.GetFilesByExtension(commonDir, "", false, cancellationToken);
+        List<string> commonFiles = commonFilesRaw.Where(f =>
             f.EndsWith(".yaml", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".yml", StringComparison.OrdinalIgnoreCase) ||
             f.EndsWith(".json", StringComparison.OrdinalIgnoreCase)).ToList();
 
@@ -207,7 +209,7 @@ public sealed class FileOperationsUtil : IFileOperationsUtil
 
     public async ValueTask DeleteAllExceptCsproj(string directoryPath, CancellationToken cancellationToken = default)
     {
-        if (!Directory.Exists(directoryPath))
+        if (!(await _directoryUtil.Exists(directoryPath, cancellationToken)))
         {
             _logger.LogWarning("Directory does not exist: {DirectoryPath}", directoryPath);
             return;
@@ -216,7 +218,8 @@ public sealed class FileOperationsUtil : IFileOperationsUtil
         try
         {
             // Delete all files except .csproj
-            foreach (string file in Directory.GetFiles(directoryPath, "*", SearchOption.AllDirectories))
+            List<string> files = await _directoryUtil.GetFilesByExtension(directoryPath, "", true, cancellationToken);
+            foreach (string file in files)
             {
                 if (!file.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase))
                 {
@@ -233,14 +236,16 @@ public sealed class FileOperationsUtil : IFileOperationsUtil
             }
 
             // Delete all empty subdirectories
-            foreach (string dir in Directory.GetDirectories(directoryPath, "*", SearchOption.AllDirectories)
-                         .OrderByDescending(d => d.Length)) // Sort by depth to delete from deepest first
+            List<string> dirs = await _directoryUtil.GetAllDirectoriesRecursively(directoryPath, cancellationToken);
+            foreach (string dir in dirs.OrderByDescending(d => d.Length)) // Sort by depth to delete from deepest first
             {
                 try
                 {
-                    if (Directory.Exists(dir) && !Directory.EnumerateFileSystemEntries(dir).Any())
+                    List<string> dirFiles = await _directoryUtil.GetFilesByExtension(dir, "", false, cancellationToken);
+                    List<string> subDirs = await _directoryUtil.GetAllDirectories(dir, cancellationToken);
+                    if (dirFiles.Count == 0 && subDirs.Count == 0)
                     {
-                        Directory.Delete(dir, recursive: false);
+                        await _directoryUtil.Delete(dir, cancellationToken);
                         _logger.LogInformation("Deleted empty directory: {DirectoryPath}", dir);
                     }
                 }
