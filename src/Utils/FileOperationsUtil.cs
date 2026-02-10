@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi;
 using Microsoft.OpenApi.Reader;
 using Soenneker.Extensions.Stream;
@@ -98,7 +98,7 @@ public sealed class FileOperationsUtil : IFileOperationsUtil
 
         string srcDirectory = Path.Combine(gitDirectory, "src");
 
-        DeleteAllExceptCsproj(srcDirectory);
+        await DeleteAllExceptCsproj(srcDirectory, cancellationToken).NoSync();
 
         await _openApiFixer.GenerateKiota(fixedFilePath, "HighLevelOpenApiClient", Constants.Library, srcDirectory, cancellationToken);
 
@@ -207,7 +207,7 @@ public sealed class FileOperationsUtil : IFileOperationsUtil
         return sb.ToString();
     }
 
-    public void DeleteAllExceptCsproj(string directoryPath)
+    public async ValueTask DeleteAllExceptCsproj(string directoryPath, CancellationToken cancellationToken = default)
     {
         if (!Directory.Exists(directoryPath))
         {
@@ -224,7 +224,7 @@ public sealed class FileOperationsUtil : IFileOperationsUtil
                 {
                     try
                     {
-                        File.Delete(file);
+                        await _fileUtil.Delete(file, ignoreMissing: true, log: true, cancellationToken).NoSync();
                         _logger.LogInformation("Deleted file: {FilePath}", file);
                     }
                     catch (Exception ex)
