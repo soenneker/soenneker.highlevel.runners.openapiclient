@@ -52,8 +52,8 @@ public sealed class FileOperationsUtil : IFileOperationsUtil
 
         string appsDirectory = Path.Combine(gitDirectory, "apps");
 
-        _directoryUtil.CreateIfDoesNotExist(Path.Combine(gitDirectory, "common"));
-        _directoryUtil.CreateIfDoesNotExist(appsDirectory);
+        await _directoryUtil.Create(Path.Combine(gitDirectory, "common"), cancellationToken: cancellationToken);
+        await _directoryUtil.Create(appsDirectory, cancellationToken: cancellationToken);
 
         string commonFilePath = Path.Combine(gitDirectory, "common", "common-schemas.json");
         string targetFilePath = Path.Combine(appsDirectory, "openapi.json");
