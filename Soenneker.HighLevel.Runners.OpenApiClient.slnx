@@ -4,10 +4,11 @@
   </Folder>
   <Folder Name="/.github/workflows/">
     <File Path=".github/workflows/build-and-test.yml" />
-    <File Path=".github/workflows/daily-automatic-update.yml" />
+    <File Path=".github/workflows/codeql.yml" />
+    <File Path=".github/workflows/publish-package.yml" />
   </Folder>
   <Folder Name="/src/">
-    <Project Path="src/Soenneker.HighLevel.Runners.OpenApiClient.csproj" />
+    <Project Path="src/Soenneker.HighLevel.Runners.OpenApiClient/Soenneker.HighLevel.Runners.OpenApiClient.csproj" />
   </Folder>
   <Folder Name="/test/">
     <Project Path="test/Soenneker.HighLevel.Runners.OpenApiClient.Tests/Soenneker.HighLevel.Runners.OpenApiClient.Tests.csproj" />
