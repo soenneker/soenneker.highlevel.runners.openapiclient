@@ -1,13 +1,10 @@
 using Microsoft.Extensions.Logging;
-using Microsoft.OpenApi;
-using Microsoft.OpenApi.Reader;
-using Soenneker.Extensions.Stream;
 using Soenneker.Extensions.String;
-using Soenneker.Extensions.Task;
 using Soenneker.Extensions.ValueTask;
 using Soenneker.Git.Util.Abstract;
 using Soenneker.HighLevel.Runners.OpenApiClient.Utils.Abstract;
 using Soenneker.OpenApi.Fixer.Abstract;
+using Soenneker.OpenApi.Merger.Abstract;
 using Soenneker.Utils.Directory.Abstract;
 using Soenneker.Utils.Dotnet.Abstract;
 using Soenneker.Utils.Environment;
@@ -17,9 +14,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.OpenApi;
 
 namespace Soenneker.HighLevel.Runners.OpenApiClient.Utils;
 
@@ -33,9 +30,10 @@ public sealed class FileOperationsUtil : IFileOperationsUtil
     private readonly IFileUtil _fileUtil;
     private readonly IDirectoryUtil _directoryUtil;
     private readonly IOpenApiFixer _openApiFixer;
+    private readonly IOpenApiMerger _openApiMerger;
 
     public FileOperationsUtil(ILogger<FileOperationsUtil> logger, IGitUtil gitUtil, IDotnetUtil dotnetUtil, IProcessUtil processUtil, IFileUtil fileUtil,
-        IDirectoryUtil directoryUtil, IOpenApiFixer openApiFixer)
+        IDirectoryUtil directoryUtil, IOpenApiFixer openApiFixer, IOpenApiMerger openApiMerger)
     {
         _logger = logger;
         _gitUtil = gitUtil;
@@ -44,11 +42,13 @@ public sealed class FileOperationsUtil : IFileOperationsUtil
         _fileUtil = fileUtil;
         _directoryUtil = directoryUtil;
         _openApiFixer = openApiFixer;
+        _openApiMerger = openApiMerger;
     }
 
     public async ValueTask Process(CancellationToken cancellationToken = default)
     {
-        string gitDirectory = await _gitUtil.CloneToTempDirectory($"https://github.com/soenneker/{Constants.Library.ToLowerInvariantFast()}", cancellationToken: cancellationToken);
+        string gitDirectory = await _gitUtil.CloneToTempDirectory($"https://github.com/soenneker/{Constants.Library.ToLowerInvariantFast()}",
+            cancellationToken: cancellationToken);
 
         string appsDirectory = Path.Combine(gitDirectory, "apps");
 
@@ -62,33 +62,37 @@ public sealed class FileOperationsUtil : IFileOperationsUtil
         await _fileUtil.DeleteIfExists(commonFilePath, cancellationToken: cancellationToken);
         await _fileUtil.DeleteIfExists(targetFilePath, cancellationToken: cancellationToken);
 
-        string openapiDocsDirectory = await _gitUtil.CloneToTempDirectory("https://github.com/GoHighLevel/highlevel-api-docs", cancellationToken: cancellationToken);
+        string openapiDocsDirectory =
+            await _gitUtil.CloneToTempDirectory("https://github.com/GoHighLevel/highlevel-api-docs", cancellationToken: cancellationToken);
 
         string appsDir = Path.Combine(openapiDocsDirectory, "apps");
 
         string commonDir = Path.Combine(openapiDocsDirectory, "common");
 
         List<string> appsFiles = await _directoryUtil.GetFilesByExtension(appsDir, "", false, cancellationToken);
-        List<string> files = appsFiles.Where(f =>
-            f.EndsWith(".yaml", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".yml", StringComparison.OrdinalIgnoreCase) ||
-            f.EndsWith(".json", StringComparison.OrdinalIgnoreCase)).ToList();
+        List<string> files = appsFiles.Where(f => f.EndsWith(".yaml", StringComparison.OrdinalIgnoreCase) ||
+                                                  f.EndsWith(".yml", StringComparison.OrdinalIgnoreCase) ||
+                                                  f.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+                                      .ToList();
 
         List<string> commonFilesRaw = await _directoryUtil.GetFilesByExtension(commonDir, "", false, cancellationToken);
-        List<string> commonFiles = commonFilesRaw.Where(f =>
-            f.EndsWith(".yaml", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".yml", StringComparison.OrdinalIgnoreCase) ||
-            f.EndsWith(".json", StringComparison.OrdinalIgnoreCase)).ToList();
+        List<string> commonFiles = commonFilesRaw.Where(f => f.EndsWith(".yaml", StringComparison.OrdinalIgnoreCase) ||
+                                                             f.EndsWith(".yml", StringComparison.OrdinalIgnoreCase) ||
+                                                             f.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+                                                 .ToList();
 
         files.AddRange(commonFiles);
 
         (string prefix, string f)[] inputs = files.Select(f =>
-        {
-            string prefix = Path.GetFileNameWithoutExtension(f);
-            return (prefix, f);
-        }).ToArray();
+                                                  {
+                                                      string prefix = Path.GetFileNameWithoutExtension(f);
+                                                      return (prefix, f);
+                                                  })
+                                                  .ToArray();
 
-        OpenApiDocument merged = await MergeOpenApis(inputs);
+        OpenApiDocument merged = await _openApiMerger.MergeOpenApis(inputs, cancellationToken);
 
-        string json = ToJson(merged);
+        string json = _openApiMerger.ToJson(merged);
 
         await _fileUtil.Write(targetFilePath, json, true, cancellationToken);
 
@@ -100,111 +104,13 @@ public sealed class FileOperationsUtil : IFileOperationsUtil
 
         string srcDirectory = Path.Combine(gitDirectory, "src", Constants.Library);
 
-        await DeleteAllExceptCsproj(srcDirectory, cancellationToken).NoSync();
+        await DeleteAllExceptCsproj(srcDirectory, cancellationToken)
+            .NoSync();
 
         await _openApiFixer.GenerateKiota(fixedFilePath, "HighLevelOpenApiClient", Constants.Library, gitDirectory, cancellationToken);
 
-        await BuildAndPush(gitDirectory, cancellationToken).NoSync();
-    }
-
-    public async ValueTask<OpenApiDocument> MergeOpenApis(params (string prefix, string file)[] inputs)
-    {
-        var merged = new OpenApiDocument
-        {
-            Info = new OpenApiInfo { Title = "Merged HL APIs", Version = "1.0.0" },
-            Paths = new OpenApiPaths(),
-            Components = new OpenApiComponents(),
-            Servers = new List<OpenApiServer>()
-        };
-
-        foreach ((string prefix, string file) in inputs)
-        {
-            await using var memoryStream = await _fileUtil.ReadToMemoryStream(file, cancellationToken: CancellationToken.None);
-            memoryStream.ToStart();
-
-            var uri = new Uri($"file://{file}");
-
-            var reader = new OpenApiJsonReader();
-
-            ReadResult readResult = await reader.ReadAsync(memoryStream, uri, new OpenApiReaderSettings()).NoSync();
-
-            OpenApiDocument? document = readResult.Document;
-
-            if (document == null)
-            {
-                _logger.LogInformation("Document was null, skipping");
-                continue;
-            }
-
-            // carry over servers (dedupe by URL)
-            foreach (OpenApiServer s in document.Servers ?? Enumerable.Empty<OpenApiServer>())
-                if (!merged.Servers.Any(x => x.Url == s.Url))
-                    merged.Servers.Add(s);
-
-            // 1) merge paths with a prefix (e.g., "/contacts")
-            foreach (KeyValuePair<string, IOpenApiPathItem> kvp in document.Paths)
-            {
-                string trimmedPrefix = prefix.Trim('/');
-                string newKey;
-                
-                // Check if the path already starts with the prefix to avoid duplication
-                if (kvp.Key.StartsWith("/" + trimmedPrefix + "/") || kvp.Key == "/" + trimmedPrefix)
-                {
-                    newKey = kvp.Key; // Use the original path if it already has the prefix
-                }
-                else
-                {
-                    newKey = "/" + trimmedPrefix + (kvp.Key.StartsWith("/") ? "" : "/") + kvp.Key;
-                }
-                
-                merged.Paths[newKey] = kvp.Value;
-            }
-
-            // 2) merge components with a name prefix to avoid clashes
-            string compPrefix = ToSafeId(prefix) + "_";
-
-            static IDictionary<string, T> CopyDict<T>(IDictionary<string, T>? from, IDictionary<string, T>? to, string compPrefix)
-            {
-                var target = to ?? new Dictionary<string, T>();
-                if (from is null) return target;
-
-                foreach (var c in from)
-                {
-                    var name = target.ContainsKey(c.Key) ? compPrefix + c.Key : c.Key;
-                    while (target.ContainsKey(name)) name = "_" + name;
-                    target[name] = c.Value;
-                }
-
-                return target;
-            }
-
-            OpenApiComponents src = document.Components ?? new OpenApiComponents();
-            OpenApiComponents? dst = merged.Components;
-
-            dst.Schemas = CopyDict(src.Schemas, dst.Schemas, compPrefix);
-            dst.Parameters = CopyDict(src.Parameters, dst.Parameters, compPrefix);
-            dst.Responses = CopyDict(src.Responses, dst.Responses, compPrefix);
-            dst.RequestBodies = CopyDict(src.RequestBodies, dst.RequestBodies, compPrefix);
-            dst.Headers = CopyDict(src.Headers, dst.Headers, compPrefix);
-            dst.SecuritySchemes = CopyDict(src.SecuritySchemes, dst.SecuritySchemes, compPrefix);
-            dst.Links = CopyDict(src.Links, dst.Links, compPrefix);
-            dst.Callbacks = CopyDict(src.Callbacks, dst.Callbacks, compPrefix);
-            dst.Examples = CopyDict(src.Examples, dst.Examples, compPrefix);
-            // (You can also rewrite $refs inside operations if you need strict renaming.)
-        }
-
-        return merged;
-
-        static string ToSafeId(string s) =>
-            new string(s.Select(ch => char.IsLetterOrDigit(ch) ? ch : '_').ToArray());
-    }
-
-    public static string ToJson(OpenApiDocument doc)
-    {
-        using var sb = new StringWriter(new StringBuilder(1024));
-        var writer = new OpenApiJsonWriter(sb);
-        doc.SerializeAsV3(writer);
-        return sb.ToString();
+        await BuildAndPush(gitDirectory, cancellationToken)
+            .NoSync();
     }
 
     public async ValueTask DeleteAllExceptCsproj(string directoryPath, CancellationToken cancellationToken = default)
@@ -225,7 +131,8 @@ public sealed class FileOperationsUtil : IFileOperationsUtil
                 {
                     try
                     {
-                        await _fileUtil.Delete(file, ignoreMissing: true, log: true, cancellationToken).NoSync();
+                        await _fileUtil.Delete(file, ignoreMissing: true, log: true, cancellationToken)
+                                       .NoSync();
                         _logger.LogInformation("Deleted file: {FilePath}", file);
                     }
                     catch (Exception ex)

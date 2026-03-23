@@ -5,7 +5,6 @@ using System;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
-using Soenneker.Utils.Delay;
 
 namespace Soenneker.HighLevel.Runners.OpenApiClient;
 
@@ -47,8 +46,6 @@ public sealed class ConsoleHostedService : IHostedService
                         Debugger.Break();
 
                     _logger.LogError(e, "Unhandled exception");
-
-                    await DelayUtil.Delay(2000, null, cancellationToken);
                     _exitCode = 1;
                 }
                 finally
