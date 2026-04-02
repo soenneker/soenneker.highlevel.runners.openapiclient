@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Soenneker.Extensions.String;
 using Soenneker.Extensions.ValueTask;
+using Soenneker.Kiota.Util.Abstract;
 using Soenneker.Git.Util.Abstract;
 using Soenneker.HighLevel.Runners.OpenApiClient.Utils.Abstract;
 using Soenneker.OpenApi.Fixer.Abstract;
@@ -27,18 +28,20 @@ public sealed class FileOperationsUtil : IFileOperationsUtil
     private readonly IGitUtil _gitUtil;
     private readonly IDotnetUtil _dotnetUtil;
     private readonly IProcessUtil _processUtil;
+    private readonly IKiotaUtil _kiotaUtil;
     private readonly IFileUtil _fileUtil;
     private readonly IDirectoryUtil _directoryUtil;
     private readonly IOpenApiFixer _openApiFixer;
     private readonly IOpenApiMerger _openApiMerger;
 
     public FileOperationsUtil(ILogger<FileOperationsUtil> logger, IGitUtil gitUtil, IDotnetUtil dotnetUtil, IProcessUtil processUtil, IFileUtil fileUtil,
-        IDirectoryUtil directoryUtil, IOpenApiFixer openApiFixer, IOpenApiMerger openApiMerger)
+        IDirectoryUtil directoryUtil, IOpenApiFixer openApiFixer, IOpenApiMerger openApiMerger, IKiotaUtil kiotaUtil)
     {
         _logger = logger;
         _gitUtil = gitUtil;
         _dotnetUtil = dotnetUtil;
         _processUtil = processUtil;
+        _kiotaUtil = kiotaUtil;
         _fileUtil = fileUtil;
         _directoryUtil = directoryUtil;
         _openApiFixer = openApiFixer;
@@ -100,7 +103,7 @@ public sealed class FileOperationsUtil : IFileOperationsUtil
 
         await RefReplacer.ReplaceRefs(_fileUtil, fixedFilePath, fixedFilePath, cancellationToken);
 
-        await _processUtil.Start("dotnet", null, "tool update --global Microsoft.OpenApi.Kiota", waitForExit: true, cancellationToken: cancellationToken);
+        await _kiotaUtil.EnsureInstalled(cancellationToken);
 
         string srcDirectory = Path.Combine(gitDirectory, "src", Constants.Library);
 
