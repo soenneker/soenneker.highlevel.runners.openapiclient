@@ -27,20 +27,18 @@ public sealed class FileOperationsUtil : IFileOperationsUtil
     private readonly ILogger<FileOperationsUtil> _logger;
     private readonly IGitUtil _gitUtil;
     private readonly IDotnetUtil _dotnetUtil;
-    private readonly IProcessUtil _processUtil;
     private readonly IKiotaUtil _kiotaUtil;
     private readonly IFileUtil _fileUtil;
     private readonly IDirectoryUtil _directoryUtil;
     private readonly IOpenApiFixer _openApiFixer;
     private readonly IOpenApiMerger _openApiMerger;
 
-    public FileOperationsUtil(ILogger<FileOperationsUtil> logger, IGitUtil gitUtil, IDotnetUtil dotnetUtil, IProcessUtil processUtil, IFileUtil fileUtil,
+    public FileOperationsUtil(ILogger<FileOperationsUtil> logger, IGitUtil gitUtil, IDotnetUtil dotnetUtil, IFileUtil fileUtil,
         IDirectoryUtil directoryUtil, IOpenApiFixer openApiFixer, IOpenApiMerger openApiMerger, IKiotaUtil kiotaUtil)
     {
         _logger = logger;
         _gitUtil = gitUtil;
         _dotnetUtil = dotnetUtil;
-        _processUtil = processUtil;
         _kiotaUtil = kiotaUtil;
         _fileUtil = fileUtil;
         _directoryUtil = directoryUtil;
@@ -110,7 +108,7 @@ public sealed class FileOperationsUtil : IFileOperationsUtil
         await DeleteAllExceptCsproj(srcDirectory, cancellationToken)
             .NoSync();
 
-        await _openApiFixer.GenerateKiota(fixedFilePath, "HighLevelOpenApiClient", Constants.Library, gitDirectory, cancellationToken);
+        await _kiotaUtil.Generate(fixedFilePath, "HighLevelOpenApiClient", Constants.Library, gitDirectory, cancellationToken);
 
         await BuildAndPush(gitDirectory, cancellationToken)
             .NoSync();
