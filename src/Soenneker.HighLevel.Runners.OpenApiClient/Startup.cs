@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Soenneker.Kiota.Util.Registrars;
 using Soenneker.Managers.Runners.Registrars;
 using Soenneker.HighLevel.Runners.OpenApiClient.Utils;
@@ -23,12 +23,12 @@ public static class Startup
     public static IServiceCollection SetupIoC(this IServiceCollection services)
     {
         services.AddHostedService<ConsoleHostedService>()
-                .AddScoped<IFileOperationsUtil, FileOperationsUtil>()
-                .AddRunnersManagerAsScoped()
-                .AddFileDownloadUtilAsScoped()
-                .AddOpenApiFixerAsScoped()
-                .AddOpenApiMergerAsScoped()
-                .AddKiotaUtilAsScoped();
+                .AddSingleton<IFileOperationsUtil, FileOperationsUtil>()
+                .AddRunnersManagerAsSingleton()
+                .AddFileDownloadUtilAsSingleton()
+                .AddOpenApiFixerAsSingleton()
+                .AddOpenApiMergerAsSingleton()
+                .AddKiotaUtilAsSingleton();
 
         return services;
     }
