@@ -4,6 +4,9 @@ using Soenneker.Utils.File.Abstract;
 
 namespace Soenneker.HighLevel.Runners.OpenApiClient.Utils;
 
+/// <summary>
+/// Represents the ref replacer.
+/// </summary>
 public static class RefReplacer
 {
     private static readonly (string oldRef, string newRef)[] _replacements =
@@ -18,6 +21,14 @@ public static class RefReplacer
             "\"$ref\": \"#/components/schemas/UnprocessableDTO\"")
     ];
 
+    /// <summary>
+    /// Executes the replace refs operation.
+    /// </summary>
+    /// <param name="fileUtil">The file util.</param>
+    /// <param name="inputPath">The input path.</param>
+    /// <param name="outputPath">The output path.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public static async Task ReplaceRefs(IFileUtil fileUtil, string inputPath, string outputPath, CancellationToken cancellationToken = default)
     {
         string text = await fileUtil.Read(inputPath, cancellationToken: cancellationToken);
