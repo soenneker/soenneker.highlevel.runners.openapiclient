@@ -18,6 +18,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.OpenApi;
+using Soenneker.Utils.Yaml.Abstract;
 
 namespace Soenneker.HighLevel.Runners.OpenApiClient.Utils;
 
@@ -32,9 +33,10 @@ public sealed class FileOperationsUtil : IFileOperationsUtil
     private readonly IDirectoryUtil _directoryUtil;
     private readonly IOpenApiFixer _openApiFixer;
     private readonly IOpenApiMerger _openApiMerger;
+    private readonly IYamlUtil _yamlUtil;
 
     public FileOperationsUtil(ILogger<FileOperationsUtil> logger, IGitUtil gitUtil, IDotnetUtil dotnetUtil, IFileUtil fileUtil,
-        IDirectoryUtil directoryUtil, IOpenApiMerger openApiMerger, IKiotaUtil kiotaUtil, IOpenApiFixer openApiFixer)
+        IDirectoryUtil directoryUtil, IOpenApiMerger openApiMerger, IKiotaUtil kiotaUtil, IOpenApiFixer openApiFixer, IYamlUtil yamlUtil)
     {
         _logger = logger;
         _gitUtil = gitUtil;
@@ -44,6 +46,7 @@ public sealed class FileOperationsUtil : IFileOperationsUtil
         _directoryUtil = directoryUtil;
         _openApiFixer = openApiFixer;
         _openApiMerger = openApiMerger;
+        _yamlUtil = yamlUtil;
     }
 
     public async ValueTask Process(CancellationToken cancellationToken = default)
@@ -83,6 +86,13 @@ public sealed class FileOperationsUtil : IFileOperationsUtil
                                                  .ToList();
 
         files.AddRange(commonFiles);
+
+        // Convert all dependencies before fixing any document, preserving relative reference filenames.
+        foreach (string file in files.Where(file => !file.EndsWith(".json", StringComparison.OrdinalIgnoreCase)))
+            await _yamlUtil.SaveAsJson(file, file, true, cancellationToken);
+
+        foreach (string file in files)
+            await _openApiFixer.Fix(file, file, cancellationToken).NoSync();
 
         (string prefix, string f)[] inputs = files.Select(f =>
                                                   {
