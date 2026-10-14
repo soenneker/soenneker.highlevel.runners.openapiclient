@@ -55,7 +55,7 @@
         <PackageReference Include="Soenneker.Kiota.Util" Version="4.0.160" />
         <PackageReference Include="Soenneker.Managers.Runners" Version="4.0.2631" />
         <PackageReference Include="Soenneker.OpenApi.Fixer" Version="4.0.392" />
-        <PackageReference Include="Soenneker.OpenApi.Merger" Version="4.0.220" />
+        <PackageReference Include="Soenneker.OpenApi.Merger" Version="4.0.221" />
         <PackageReference Include="Soenneker.Utils.File.Download" Version="4.0.1813" />
     </ItemGroup>
     <ItemGroup>
