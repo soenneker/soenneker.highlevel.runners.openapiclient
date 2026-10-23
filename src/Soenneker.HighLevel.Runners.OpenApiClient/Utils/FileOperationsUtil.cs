@@ -119,6 +119,7 @@ public sealed class FileOperationsUtil : IFileOperationsUtil
             .NoSync();
 
         await _kiotaUtil.Generate(fixedFilePath, "HighLevelOpenApiClient", Constants.Library, gitDirectory, cancellationToken);
+        await _openApiFixer.SanitizeGeneratedEnumMembers(Path.Combine(gitDirectory, "src", Constants.Library), cancellationToken).NoSync();
 
         await BuildAndPush(gitDirectory, cancellationToken)
             .NoSync();
